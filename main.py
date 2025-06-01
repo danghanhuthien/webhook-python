@@ -12,7 +12,7 @@ def sepay_webhook():
     message = f"Sepay: {data.get('Sender')} gửi {data.get('Amount')} với nội dung: {data.get('Content')}"
 
     # Gửi HTTP POST sang MVC API
-    requests.post("https://your-mvc-site.com/api/Notify/Push", json={"message": message})
+    requests.post("https://localhost:7168/api/Notify/Push", json={"message": message})
 
     # Chuẩn bị phản hồi
     response = {
