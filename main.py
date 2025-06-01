@@ -9,7 +9,7 @@ def sepay_webhook():
 
     # Chuẩn bị dữ liệu phản hồi
     response = {
-        "message": "Webhook nhận thành công",
+        "message": "Webhook nhận thành công hehe",
         "data": data
     }
 
