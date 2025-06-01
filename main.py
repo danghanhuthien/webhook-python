@@ -1,4 +1,5 @@
 from flask import Flask, request, jsonify
+import requests
 
 app = Flask(__name__)
 
@@ -7,7 +8,13 @@ def sepay_webhook():
     data = request.json
     print('📩 Nhận webhook từ Sepay:', data)
 
-    # Chuẩn bị dữ liệu phản hồi
+    # Tạo nội dung message gửi sang .NET MVC
+    message = f"Sepay: {data.get('Sender')} gửi {data.get('Amount')} với nội dung: {data.get('Content')}"
+
+    # Gửi HTTP POST sang MVC API
+    requests.post("https://your-mvc-site.com/api/Notify/Push", json={"message": message})
+
+    # Chuẩn bị phản hồi
     response = {
         "message": "Webhook nhận thành công hehe",
         "data": data
