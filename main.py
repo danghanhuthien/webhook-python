@@ -5,13 +5,15 @@ app = Flask(__name__)
 @app.route('/sepay-webhook', methods=['POST'])
 def sepay_webhook():
     data = request.json
-
     print('📩 Nhận webhook từ Sepay:', data)
 
-    # Xử lý dữ liệu (nếu cần)
-    # Ví dụ: Gửi tin nhắn lên Facebook, lưu file JSON...
+    # Chuẩn bị dữ liệu phản hồi
+    response = {
+        "message": "Webhook nhận thành công",
+        "data": data
+    }
 
-    return jsonify({'message': 'Webhook nhận thành công'}), 200
+    return jsonify(response), 200
 
 @app.route('/', methods=['GET'])
 def index():
