@@ -37,13 +37,39 @@ def extract_order_id(content):
     if not content:
         return ""
     
-    # Tìm GUID pattern trong nội dung
-    guid_pattern = r'[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}'
-    match = re.search(guid_pattern, content)
+    logger.info(f"Đang phân tích nội dung: {content}")
     
-    if match:
-        return match.group(0)
+    # Pattern 1: Tìm chuỗi 32 ký tự hex (không có dấu gạch ngang)
+    # Ví dụ: 47b79bbde90d46f7af6724c12a575d56
+    hex_pattern = r'\b[0-9a-fA-F]{32}\b'
+    hex_match = re.search(hex_pattern, content)
     
+    if hex_match:
+        order_id = hex_match.group(0)
+        logger.info(f"Tìm thấy Order ID (hex 32): {order_id}")
+        return order_id
+    
+    # Pattern 2: Tìm GUID pattern (có dấu gạch ngang)
+    # Ví dụ: 12345678-1234-1234-1234-123456789012
+    guid_pattern = r'\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b'
+    guid_match = re.search(guid_pattern, content)
+    
+    if guid_match:
+        order_id = guid_match.group(0)
+        logger.info(f"Tìm thấy Order ID (GUID): {order_id}")
+        return order_id
+    
+    # Pattern 3: Tìm trong cấu trúc MBVCB
+    # Từ ví dụ: MBVCB.9737451341.677798.47b79bbde90d46f7af6724c12a575d56.CT
+    mbvcb_pattern = r'MBVCB\.\d+\.\d+\.([0-9a-fA-F]{32})\.'
+    mbvcb_match = re.search(mbvcb_pattern, content)
+    
+    if mbvcb_match:
+        order_id = mbvcb_match.group(1)
+        logger.info(f"Tìm thấy Order ID trong MBVCB: {order_id}")
+        return order_id
+    
+    logger.warning(f"Không tìm thấy Order ID trong nội dung: {content}")
     return ""
 
 def find_order_by_id(order_id):
@@ -86,7 +112,7 @@ def update_order_payment_status(order_id, payment_status="Đã thanh toán"):
 def home():
     return jsonify({"message": "SePay Webhook API is running!"})
 
-@app.route('/api/webhook/sepay', methods=['POST'])
+@app.route('/sepay-webhook', methods=['POST'])
 def sepay_webhook():
     """Endpoint nhận webhook từ SePay"""
     try:
@@ -95,15 +121,17 @@ def sepay_webhook():
         if not data:
             return jsonify({"success": False, "message": "Không có dữ liệu"}), 400
         
-        logger.info(f"Received webhook: {json.dumps(data)}")
+        logger.info(f"Received webhook: {json.dumps(data, ensure_ascii=False)}")
         
         # Lấy thông tin từ request
         content = data.get('content', '')
         transfer_amount = data.get('transferAmount', 0)
         transfer_type = data.get('transferType', '')
+        gateway = data.get('gateway', '')
+        transaction_date = data.get('transactionDate', '')
         
         # Chỉ xử lý giao dịch tiền vào
-        if transfer_type != "in" or transfer_amount <= 0:
+        if transfer_type != "in":
             logger.warning("Không phải giao dịch tiền vào")
             return jsonify({
                 "success": True, 
@@ -138,7 +166,9 @@ def sepay_webhook():
                 "data": {
                     "order_id": order_id,
                     "payment_status": "Đã thanh toán",
-                    "amount": transfer_amount
+                    "amount": transfer_amount,
+                    "gateway": gateway,
+                    "transaction_date": transaction_date
                 }
             })
         else:
@@ -181,6 +211,24 @@ def get_order(order_id):
         logger.error(f"Lỗi lấy thông tin order: {e}")
         return jsonify({"error": "Lỗi hệ thống"}), 500
 
+# API test để kiểm tra extract order id
+@app.route('/api/test-extract', methods=['POST'])
+def test_extract():
+    """API test trích xuất Order ID"""
+    try:
+        data = request.get_json()
+        content = data.get('content', '')
+        
+        order_id = extract_order_id(content)
+        
+        return jsonify({
+            "content": content,
+            "extracted_order_id": order_id,
+            "success": bool(order_id)
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8000, debug=True)
 
@@ -190,21 +238,27 @@ Flask==2.3.3
 pyodbc==5.0.1
 """
 
-# Để cài đặt và chạy:
+# Test với nội dung thực tế:
 """
-pip install Flask pyodbc
-python main.py
-"""
-
-# Test webhook với curl:
-"""
-curl -X POST http://localhost:8000/api/webhook/sepay \
+curl -X POST http://localhost:8000/api/test-extract \
   -H "Content-Type: application/json" \
   -d '{
-    "content": "Thanh toan don hang 12345678-1234-1234-1234-123456789012",
-    "transferAmount": 2000,
-    "transferType": "in",
-    "accountNumber": "20499761",
-    "gateway": "ACB"
+    "content": "MBVCB.9737451341.677798.47b79bbde90d46f7af6724c12a575d56.CT tu 1020608460 DANG HA NHU THIEN toi 20499761 DANG HA NHU THIEN tai ACB GD 677798-060425 22:32:01"
+  }'
+"""
+
+# Test webhook với dữ liệu thực tế:
+"""
+curl -X POST https://webhook-python-11q6.onrender.com/sepay-webhook \
+  -H "Content-Type: application/json" \
+  -d '{
+    "gateway":"ACB",
+    "transactionDate":"2025-06-04 22:32:01",
+    "accountNumber":"20499761",
+    "subAccount":null,
+    "code":null,
+    "content":"MBVCB.9737451341.677798.47b79bbde90d46f7af6724c12a575d56.CT tu 1020608460 DANG HA NHU THIEN toi 20499761 DANG HA NHU THIEN tai ACB GD 677798-060425 22:32:01",
+    "transferType":"in",
+    "description":"BankAPINotify MBVCB.9737451341.677798.47b79bbde90d46f7af6724c12a575d56.CT tu 1020608460 DANG HA NHU THIEN toi 20499761 DANG HA NHU THIEN tai ACB"
   }'
 """
