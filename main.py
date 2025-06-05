@@ -32,44 +32,168 @@ def get_db_connection():
         logger.error(f"Lỗi kết nối database: {e}")
         raise Exception("Lỗi kết nối database")
 
+# def extract_order_id(content):
+#     """Trích xuất Order ID từ nội dung giao dịch"""
+#     if not content:
+#         return ""
+    
+#     logger.info(f"Đang phân tích nội dung: {content}")
+    
+#     # Pattern 1: Tìm chuỗi 32 ký tự hex (không có dấu gạch ngang)
+#     # Ví dụ: 47b79bbde90d46f7af6724c12a575d56
+#     hex_pattern = r'\b[0-9a-fA-F]{32}'
+#     hex_match = re.search(hex_pattern, content)
+    
+#     if hex_match:
+#         order_id = hex_match.group(0)
+#         logger.info(f"Tìm thấy Order ID (hex 32): {order_id}")
+#         return order_id
+    
+#     # Pattern 2: Tìm GUID pattern (có dấu gạch ngang)
+#     # Ví dụ: 12345678-1234-1234-1234-123456789012
+#     guid_pattern = r'\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b'
+#     guid_match = re.search(guid_pattern, content)
+    
+#     if guid_match:
+#         order_id = guid_match.group(0)
+#         logger.info(f"Tìm thấy Order ID (GUID): {order_id}")
+#         return order_id
+    
+#     # Pattern 3: Tìm trong cấu trúc MBVCB
+#     # Từ ví dụ: MBVCB.9737451341.677798.47b79bbde90d46f7af6724c12a575d56.CT
+#     mbvcb_pattern = r'MBVCB\.\d+\.\d+\.([0-9a-fA-F]{32})\.'
+#     mbvcb_match = re.search(mbvcb_pattern, content)
+    
+#     if mbvcb_match:
+#         order_id = mbvcb_match.group(1)
+#         logger.info(f"Tìm thấy Order ID trong MBVCB: {order_id}")
+#         return order_id
+    
+#     logger.warning(f"Không tìm thấy Order ID trong nội dung: {content}")
+#     return ""
 def extract_order_id(content):
-    """Trích xuất Order ID từ nội dung giao dịch"""
+    """Trích xuất Order ID từ nội dung giao dịch một cách linh hoạt"""
     if not content:
         return ""
     
     logger.info(f"Đang phân tích nội dung: {content}")
-    
-    # Pattern 1: Tìm chuỗi 32 ký tự hex (không có dấu gạch ngang)
-    # Ví dụ: 47b79bbde90d46f7af6724c12a575d56
-    hex_pattern = r'\b[0-9a-fA-F]{32}\b'
-    hex_match = re.search(hex_pattern, content)
-    
-    if hex_match:
-        order_id = hex_match.group(0)
+
+    # Pattern 1: Tìm chuỗi hex 32 ký tự chính xác (ưu tiên cao nhất)
+    hex_32_pattern = r'[0-9a-fA-F]{32}'
+    hex_32_match = re.search(hex_32_pattern, content)
+    if hex_32_match:
+        order_id = hex_32_match.group(0)
         logger.info(f"Tìm thấy Order ID (hex 32): {order_id}")
         return order_id
-    
-    # Pattern 2: Tìm GUID pattern (có dấu gạch ngang)
-    # Ví dụ: 12345678-1234-1234-1234-123456789012
-    guid_pattern = r'\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b'
+
+    # Pattern 2: MBVCB với hex 32 ký tự
+    mbvcb_32_pattern = r'MBVCB\.\d+\.\d+\.([0-9a-fA-F]{32})\.CT'
+    mbvcb_32_match = re.search(mbvcb_32_pattern, content)
+    if mbvcb_32_match:
+        order_id = mbvcb_32_match.group(1)
+        logger.info(f"Tìm thấy Order ID trong MBVCB (32 chars): {order_id}")
+        return order_id
+
+    # Pattern 3: GUID pattern
+    guid_pattern = r'[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}'
     guid_match = re.search(guid_pattern, content)
-    
     if guid_match:
         order_id = guid_match.group(0)
         logger.info(f"Tìm thấy Order ID (GUID): {order_id}")
         return order_id
+
+    logger.warning("Không tìm thấy Order ID trong nội dung")
+    return ""    """Trích xuất Order ID từ nội dung giao dịch một cách linh hoạt"""
+    if not content:
+        return ""
     
-    # Pattern 3: Tìm trong cấu trúc MBVCB
-    # Từ ví dụ: MBVCB.9737451341.677798.47b79bbde90d46f7af6724c12a575d56.CT
-    mbvcb_pattern = r'MBVCB\.\d+\.\d+\.([0-9a-fA-F]{32})\.'
+    logger.info(f"Đang phân tích nội dung: {content}")
+
+    # Pattern 1: MBVCB với hex 32 ký tự (ưu tiên cao nhất)
+    mbvcb_32_pattern = r'MBVCB\.\d+\.\d+\.([0-9a-fA-F]{32})\.CT'
+    mbvcb_32_match = re.search(mbvcb_32_pattern, content)
+    if mbvcb_32_match:
+        order_id = mbvcb_32_match.group(1)
+        logger.info(f"Tìm thấy Order ID trong MBVCB (32 chars): {order_id}")
+        return order_id
+
+    # Pattern 2: MBVCB với hex 31 ký tự (để xử lý trường hợp thiếu ký tự đầu)
+    mbvcb_31_pattern = r'MBVCB\.\d+\.\d+\.([0-9a-fA-F]{31})\.CT'
+    mbvcb_31_match = re.search(mbvcb_31_pattern, content)
+    if mbvcb_31_match:
+        order_id = mbvcb_31_match.group(1)
+        # Thêm ký tự '4' vào đầu để tạo thành 32 ký tự
+        order_id = '4' + order_id
+        logger.info(f"Tìm thấy Order ID trong MBVCB (31 chars, đã thêm '4'): {order_id}")
+        return order_id
+
+    # Pattern 3: MBVCB với hex từ 28-32 ký tự (linh hoạt hơn)
+    mbvcb_flex_pattern = r'MBVCB\.\d+\.\d+\.([0-9a-fA-F]{28,32})\.CT'
+    mbvcb_flex_match = re.search(mbvcb_flex_pattern, content)
+    if mbvcb_flex_match:
+        order_id = mbvcb_flex_match.group(1)
+        # Nếu ít hơn 32 ký tự, thêm '4' vào đầu
+        if len(order_id) < 32:
+            order_id = '4' + order_id
+        logger.info(f"Tìm thấy Order ID trong MBVCB (flex): {order_id}")
+        return order_id
+
+    # Pattern 4: Tìm chuỗi hex 32 ký tự bất kỳ đâu trong content
+    hex_32_pattern = r'[0-9a-fA-F]{32}'
+    hex_32_match = re.search(hex_32_pattern, content)
+    if hex_32_match:
+        order_id = hex_32_match.group(0)
+        logger.info(f"Tìm thấy Order ID (hex 32): {order_id}")
+        return order_id
+
+    # Pattern 5: Tìm chuỗi hex 31 ký tự và thêm '4' vào đầu
+    hex_31_pattern = r'[0-9a-fA-F]{31}'
+    hex_31_match = re.search(hex_31_pattern, content)
+    if hex_31_match:
+        order_id = '4' + hex_31_match.group(0)
+        logger.info(f"Tìm thấy Order ID (hex 31, đã thêm '4'): {order_id}")
+        return order_id
+
+    # Pattern 6: GUID pattern (dự phòng)
+    guid_pattern = r'[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}'
+    guid_match = re.search(guid_pattern, content)
+    if guid_match:
+        order_id = guid_match.group(0)
+        logger.info(f"Tìm thấy Order ID (GUID): {order_id}")
+        return order_id
+
+    logger.warning("Không tìm thấy Order ID trong nội dung")
+    return ""    """Trích xuất Order ID từ nội dung giao dịch một cách linh hoạt"""
+    if not content:
+        return ""
+    
+    logger.info(f"Đang phân tích nội dung: {content}")
+
+    # Ưu tiên pattern MBVCB.xxx.xxx.<hex32>.CT
+    mbvcb_pattern = r'MBVCB\.\d+\.\d+\.(?P<orderid>[0-9a-fA-F]{32})\.CT'
     mbvcb_match = re.search(mbvcb_pattern, content)
-    
     if mbvcb_match:
-        order_id = mbvcb_match.group(1)
+        order_id = mbvcb_match.group("orderid")
         logger.info(f"Tìm thấy Order ID trong MBVCB: {order_id}")
         return order_id
-    
-    logger.warning(f"Không tìm thấy Order ID trong nội dung: {content}")
+
+    # Dự phòng: tìm chuỗi hex 32 ký tự
+    hex_pattern = r'[0-9a-fA-F]{32}'
+    hex_match = re.search(hex_pattern, content)
+    if hex_match:
+        order_id = hex_match.group(0)
+        logger.info(f"Tìm thấy Order ID (hex): {order_id}")
+        return order_id
+
+    # Dự phòng: GUID
+    guid_pattern = r'[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}'
+    guid_match = re.search(guid_pattern, content)
+    if guid_match:
+        order_id = guid_match.group(0)
+        logger.info(f"Tìm thấy Order ID (GUID): {order_id}")
+        return order_id
+
+    logger.warning("Không tìm thấy Order ID trong nội dung")
     return ""
 
 def find_order_by_id(order_id):
@@ -125,6 +249,7 @@ def sepay_webhook():
         
         # Lấy thông tin từ request
         content = data.get('content', '')
+        description = data.get('description', '')  # Thêm description
         transfer_amount = data.get('transferAmount', 0)
         transfer_type = data.get('transferType', '')
         gateway = data.get('gateway', '')
@@ -138,10 +263,20 @@ def sepay_webhook():
                 "message": "Không phải giao dịch tiền vào"
             })
         
-        # Trích xuất Order ID từ nội dung
-        order_id = extract_order_id(content)
+        # Trích xuất Order ID từ description trước, nếu không có thì từ content
+        order_id = ""
+        if description:
+            order_id = extract_order_id(description)
+            if order_id:
+                logger.info(f"Tìm thấy Order ID trong description: {order_id}")
+        
+        if not order_id and content:
+            order_id = extract_order_id(content)
+            if order_id:
+                logger.info(f"Tìm thấy Order ID trong content: {order_id}")
+        
         if not order_id:
-            logger.warning(f"Không tìm thấy Order ID trong: {content}")
+            logger.warning(f"Không tìm thấy Order ID trong cả content và description")
             return jsonify({
                 "success": False, 
                 "message": "Không tìm thấy Order ID trong nội dung giao dịch"
@@ -184,7 +319,6 @@ def sepay_webhook():
             "success": False, 
             "message": "Lỗi hệ thống"
         }), 500
-
 @app.route('/api/order/<order_id>', methods=['GET'])
 def get_order(order_id):
     """API kiểm tra thông tin order"""
@@ -226,12 +360,14 @@ def test_extract():
             "extracted_order_id": order_id,
             "success": bool(order_id)
         })
+        
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8000, debug=True)
-
+# if __name__ == '__main__':
+#     app.run(host='127.0.0.1', port=8088, debug=True)
 # requirements.txt
 """
 Flask==2.3.3
